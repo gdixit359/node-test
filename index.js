@@ -1,36 +1,34 @@
 const express = require('express');
-const jwt = require('jsonwebtoken');
 const session = require('express-session');
+
 const customer_routes = require('./router/auth_users.js').authenticated;
-const genl_routes = require('./router/general.js').general;
+const general_routes = require('./router/general.js').general;
 
 const app = express();
 
 app.use(express.json());
 
-// Session middleware
-app.use("/customer", session({
+// ✅ Apply session globally, before routers
+app.use(session({
   secret: "fingerprint_customer",
   resave: true,
   saveUninitialized: true
 }));
 
-
-// JWT Authentication middleware for customer routes
-app.use("/customer/auth/*", (req, res, next) => {
-  const token = req.session.authorization?.accessToken;
-  if (!token) return res.status(403).json({ message: "Access denied. No token provided." });
-
-  jwt.verify(token, "access", (err, user) => {
-    if (err) return res.status(403).json({ message: "Invalid token." });
-    req.user = user;
+// Optional middleware to protect certain routes
+app.use("/customer/auth/*", function auth(req, res, next) {
+  if (req.session.authorization) {
     next();
-  });
+  } else {
+    return res.status(403).json({ message: "User not logged in" });
+  }
 });
 
-const PORT = 5000;
+app.use("/", general_routes);
+app.use("/", customer_routes);
 
-app.use("/customer", customer_routes);
-app.use("/", genl_routes);
+const PORT = 5001;
 
-app.listen(PORT, () => console.log("Server is running"));
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
